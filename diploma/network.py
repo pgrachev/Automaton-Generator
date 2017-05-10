@@ -2,57 +2,105 @@ import random
 import numpy as np
 
 DICTIONARY = ['a', 'b', 'c']
-HIDDEN_LAYER_SIZE = 10
-NUMBER_OF_POSITIONS = 3
+NUMBER_OF_POSITIONS = 6
+NU = 4.0
 
 def create_network ():
     input_layer_size = NUMBER_OF_POSITIONS + len(DICTIONARY)
     output_layer_size = NUMBER_OF_POSITIONS
-    w1 = []
-    w2 = []
+    w = []
     for i in range(input_layer_size):
-        w1.append([2 * random.random() - 1 for j in range(HIDDEN_LAYER_SIZE + 1)])
-    for i in range(HIDDEN_LAYER_SIZE):
-        w2.append([2 * random.random() - 1 for j in range(output_layer_size + 1)])
-    return [w1, w2]
+        w.append([(2 * random.random() - 1) / (2 * NUMBER_OF_POSITIONS) for j in range(output_layer_size)])
+    return w
 
 def sigmoid(z):
     return 1.0/(1.0+np.exp(-z))
 
+def sigmoid_derivative(z):
+    return sigmoid(z) * (1 - sigmoid(z))
+
 def normalize(lst):
     result = [0.0] * len(lst)
-    sum_exp = 0.0
+    xmin = 100.0
+    xmax = -100.0
     for i in range(len(lst)):
-        result[i] = np.exp(lst[i])
-        sum_exp += result[i]
+        if(xmin > lst[i]):
+            xmin = lst[i]
+        if(xmax < lst[i]):
+            xmax = lst[i]
     for i in range(len(lst)):
-        result[i] /= sum_exp
+        result[i] = (lst[i] - xmin) / (xmax - xmin)
+    return result / (sum(result))
+
+
+def train(network, word, result):
+    layers = [[0.0 for x in range(NUMBER_OF_POSITIONS)] for y in range(len(word) + 1)]
+    error = [[0.0 for x in range(NUMBER_OF_POSITIONS)] for y in range(len(word) + 1)]
+    outputs = [[0.0 for x in range(NUMBER_OF_POSITIONS)] for y in range(len(word) + 1)]
+    input_layer = [[0.0 for x in range(NUMBER_OF_POSITIONS + len(DICTIONARY))] for y in range(len(word) + 1)]
+    layers[0] = [1.0] + [0.0] * (NUMBER_OF_POSITIONS - 1)
+    for k in range(len(word)):
+        char_index = DICTIONARY.index(word[k])
+        input_layer[k][char_index] = 1.0
+        for i in range(len(layers[k])):
+            input_layer[k][i + len(DICTIONARY)] = layers[k][i]
+        for j in range(len(input_layer[k])):
+            for i in range(NUMBER_OF_POSITIONS):
+                outputs[k + 1][i] += input_layer[k][j] * network[j][i]
+        for i in range(NUMBER_OF_POSITIONS):
+            layers[k + 1][i] = sigmoid(outputs[k + 1][i])
+        layers[k + 1] = normalize(layers[k + 1]);
+    for j in range(len(layers[-1])):
+        error[-1][j] = layers[-1][j] - result[j]
+    for k in range(len(word) - 1, -1, -1):
+        for fr in range(len(input_layer[k])):
+            for to in range(len(network[j])):
+                network[fr][to] -= NU * (error[k + 1][to]) * sigmoid_derivative(outputs[k + 1][to]) * input_layer[k][fr]
+        for i in range(len(error[k])):
+            for to in range(len(network[j])):
+                error[k][i] += error[k + 1][to] * sigmoid_derivative(outputs[k + 1][to]) * network[i][to]
+    return sum(map(lambda x: x * x, error[-1]))
+
+
+def initialize (network, word):
+    position = [1.0] + [0.0] * (NUMBER_OF_POSITIONS - 1);
+    for k in range(len(word)):
+        input_layer = [0.0] * (NUMBER_OF_POSITIONS + len(DICTIONARY))
+        char_index = DICTIONARY.index(word[k])
+        input_layer[char_index] = 1.0
+        for i in range(len(position)):
+            input_layer[i + len(DICTIONARY)] = position[i]
+        output_layer = [0.0] * NUMBER_OF_POSITIONS
+        for j in range(len(input_layer)):
+            for i in range(NUMBER_OF_POSITIONS):
+                output_layer[i] += input_layer[j] * network[j][i]
+        for i in range(NUMBER_OF_POSITIONS):
+            output_layer[i] = sigmoid(output_layer[i])
+        position = normalize(output_layer)
+    print position
+
+def cost_function(exp, real):
+    result = 0.0
+    for i in range(len(exp)):
+        result += (exp[i] - real[i])**2
     return result
 
-def count_level(network, char_index, positions):
-    first_layer_input = [0.0] * (char_index) + [1.0] + [0.0] * (len(DICTIONARY) - char_index - 1) + positions
-    hidden_layer_input = [0.0] * HIDDEN_LAYER_SIZE
-    new_positions = [0.0] * NUMBER_OF_POSITIONS
-
-    for j in range(len(first_layer_input)):
-        bias = network[0][j][HIDDEN_LAYER_SIZE]
-        for i in range(HIDDEN_LAYER_SIZE):
-            hidden_layer_input[i] += sigmoid(first_layer_input[j] * network[0][j][i] + bias)
-
-    for j in range(HIDDEN_LAYER_SIZE):
-        bias = network[1][j][NUMBER_OF_POSITIONS]
-        for i in range(len(positions)):
-            new_positions[i] += sigmoid(hidden_layer_input[j] * network[1][j][i])
-
-    return normalize(new_positions)
-
-def initialize(network, word):
-    position = [1.0] + [0.0] * (NUMBER_OF_POSITIONS - 1)
-    for i in range(len(word)):
-        position = count_level(network, DICTIONARY.index(word[i]), position)
-    return position
 
 
 nn = create_network()
-print initialize(nn, "abacaba")
 
+f = open('dataset.txt', 'r')
+for line in f:
+    arr = line.split(' ')
+    res_mas = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    if arr[1][0] == '0':
+        res_mas = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    train(nn, arr[0], res_mas)
+
+initialize(nn, "a")
+initialize(nn, "b")
+initialize(nn, "c")
+initialize(nn, "aacaa")
+initialize(nn, "abbba")
+initialize(nn, "aabaa")
+initialize(nn, "abacaba")
