@@ -1,106 +1,128 @@
 import random
 import numpy as np
 
-DICTIONARY = ['a', 'b', 'c']
-NUMBER_OF_POSITIONS = 6
-NU = 4.0
+DICTIONARY = ['a', 'b']
+NUMBER_OF_POSITIONS = 3
+NUMBER_OF_CHARS = len(DICTIONARY)
+PERCENT_OF_TESTS = 0.1
+PERCENT_OF_BATCH = 0.05
+MAX_RANDOM_VALUE = 0.1
+EPS = 0.01
+NU = 0.8
 
-def create_network ():
-    input_layer_size = NUMBER_OF_POSITIONS + len(DICTIONARY)
-    output_layer_size = NUMBER_OF_POSITIONS
-    w = []
-    for i in range(input_layer_size):
-        w.append([(2 * random.random() - 1) / (2 * NUMBER_OF_POSITIONS) for j in range(output_layer_size)])
-    return w
+class NeuralNetwork:
+    tensor = np.zeros([NUMBER_OF_POSITIONS, NUMBER_OF_CHARS, NUMBER_OF_POSITIONS])
+    adder = np.zeros(NUMBER_OF_POSITIONS)
+    start_position = np.zeros(NUMBER_OF_POSITIONS)
 
-def sigmoid(z):
-    return 1.0/(1.0+np.exp(-z))
+    def __init__(self):
+        self.tensor = np.random.rand(NUMBER_OF_POSITIONS, NUMBER_OF_CHARS, NUMBER_OF_POSITIONS) * MAX_RANDOM_VALUE
+        self.adder = np.full(NUMBER_OF_POSITIONS, 0.5) + np.random.rand(NUMBER_OF_POSITIONS) * MAX_RANDOM_VALUE - np.full(NUMBER_OF_POSITIONS, 0.5 * MAX_RANDOM_VALUE)
+        self.adder[0] = 0.0
+        self.adder[-1] = 1.0
+        self.start_position[0] = 1.0
 
-def sigmoid_derivative(z):
-    return sigmoid(z) * (1 - sigmoid(z))
+    def check(self, word):
+        curr_pos = self.start_position
+        for k in range(len(word)):
+            curr_word = char_to_vector(word[k])
+            curr_pos = match(self, curr_word, curr_pos)
+            curr_pos = softmax(curr_pos)
+        return lastsum(self, curr_pos)
 
-def normalize(lst):
-    result = [0.0] * len(lst)
-    xmin = 100.0
-    xmax = -100.0
-    for i in range(len(lst)):
-        if(xmin > lst[i]):
-            xmin = lst[i]
-        if(xmax < lst[i]):
-            xmax = lst[i]
-    for i in range(len(lst)):
-        result[i] = (lst[i] - xmin) / (xmax - xmin)
-    return result / (sum(result))
+    def train(self, word, exp):
+        word_length = len(word)
+        positions = np.zeros([word_length + 1, NUMBER_OF_POSITIONS])
+        d_tensor = np.zeros([NUMBER_OF_POSITIONS, NUMBER_OF_CHARS, NUMBER_OF_POSITIONS])
+        d_adder = np.zeros(NUMBER_OF_POSITIONS)
+        positions[0] = self.start_position;
 
+        for k in range(word_length):
+            curr_word = char_to_vector(word[k])
+            positions[k + 1] = softmax(match(self, curr_word, positions[k]))
+        answer = lastsum(self, positions[-1])
+        error = cost_function(exp, answer)
 
-def train(network, word, result):
-    layers = [[0.0 for x in range(NUMBER_OF_POSITIONS)] for y in range(len(word) + 1)]
-    error = [[0.0 for x in range(NUMBER_OF_POSITIONS)] for y in range(len(word) + 1)]
-    outputs = [[0.0 for x in range(NUMBER_OF_POSITIONS)] for y in range(len(word) + 1)]
-    input_layer = [[0.0 for x in range(NUMBER_OF_POSITIONS + len(DICTIONARY))] for y in range(len(word) + 1)]
-    layers[0] = [1.0] + [0.0] * (NUMBER_OF_POSITIONS - 1)
-    for k in range(len(word)):
-        char_index = DICTIONARY.index(word[k])
-        input_layer[k][char_index] = 1.0
-        for i in range(len(layers[k])):
-            input_layer[k][i + len(DICTIONARY)] = layers[k][i]
-        for j in range(len(input_layer[k])):
-            for i in range(NUMBER_OF_POSITIONS):
-                outputs[k + 1][i] += input_layer[k][j] * network[j][i]
-        for i in range(NUMBER_OF_POSITIONS):
-            layers[k + 1][i] = sigmoid(outputs[k + 1][i])
-        layers[k + 1] = normalize(layers[k + 1]);
-    for j in range(len(layers[-1])):
-        error[-1][j] = layers[-1][j] - result[j]
-    for k in range(len(word) - 1, -1, -1):
-        for fr in range(len(input_layer[k])):
-            for to in range(len(network[j])):
-                network[fr][to] -= NU * (error[k + 1][to]) * sigmoid_derivative(outputs[k + 1][to]) * input_layer[k][fr]
-        for i in range(len(error[k])):
-            for to in range(len(network[j])):
-                error[k][i] += error[k + 1][to] * sigmoid_derivative(outputs[k + 1][to]) * network[i][to]
-    return sum(map(lambda x: x * x, error[-1]))
+        gradient = cost_function_derrivative(exp, answer)
+        d_adder += lastsum_derrivative_adder(gradient, positions[-1])
+        gradient = lastsum_derrivative(self, gradient)
+        for k in range(word_length - 1, -1, -1):
+            curr_word = char_to_vector(word[k])
+            gradient = softmax_derrivative(gradient, positions[k + 1])
+            d_tensor += match_derrivative_tensor(gradient, curr_word, positions[k])
+            gradient = match_derrivative(self, gradient, curr_word)
+        self.tensor -= NU * d_tensor
+        self.adder -= NU * d_adder
 
+        return error
 
-def initialize (network, word):
-    position = [1.0] + [0.0] * (NUMBER_OF_POSITIONS - 1);
-    for k in range(len(word)):
-        input_layer = [0.0] * (NUMBER_OF_POSITIONS + len(DICTIONARY))
-        char_index = DICTIONARY.index(word[k])
-        input_layer[char_index] = 1.0
-        for i in range(len(position)):
-            input_layer[i + len(DICTIONARY)] = position[i]
-        output_layer = [0.0] * NUMBER_OF_POSITIONS
-        for j in range(len(input_layer)):
-            for i in range(NUMBER_OF_POSITIONS):
-                output_layer[i] += input_layer[j] * network[j][i]
-        for i in range(NUMBER_OF_POSITIONS):
-            output_layer[i] = sigmoid(output_layer[i])
-        position = normalize(output_layer)
-    print position
+def cost_function(exp, res):
+    return (res - exp) ** 2
 
-def cost_function(exp, real):
-    result = 0.0
-    for i in range(len(exp)):
-        result += (exp[i] - real[i])**2
-    return result
+def cost_function_derrivative(exp, res):
+    return res - exp
+
+def match(nn, ch, pos):
+    new_pos = np.zeros(NUMBER_OF_POSITIONS)
+    for k in range(NUMBER_OF_POSITIONS):
+        for i in range (NUMBER_OF_CHARS):
+            for j in range (NUMBER_OF_POSITIONS):
+                new_pos[k] += nn.tensor[k][i][j] * ch[i] * pos[j]
+    return new_pos
+
+def match_derrivative(nn, dz, ch):
+    derrivative = np.zeros([NUMBER_OF_POSITIONS, NUMBER_OF_POSITIONS])
+    for i in range(NUMBER_OF_POSITIONS):
+        for k in range(NUMBER_OF_POSITIONS):
+            for j in range (NUMBER_OF_CHARS):
+                derrivative[k][i] += nn.tensor[k][j][i] * ch[j]
+    return np.dot(dz, derrivative)
 
 
+def match_derrivative_tensor(dz, ch, pos):
+    sample_matrix = np.zeros([NUMBER_OF_CHARS, NUMBER_OF_POSITIONS])
+    for i in range(NUMBER_OF_CHARS):
+        for j in range(NUMBER_OF_POSITIONS):
+            sample_matrix[i][j] = ch[i] * pos[j]
+    derrivative = np.zeros([NUMBER_OF_POSITIONS, NUMBER_OF_CHARS, NUMBER_OF_POSITIONS])
+    for i in range(NUMBER_OF_POSITIONS):
+        derrivative[i] = dz[i] * sample_matrix
+    return derrivative
 
-nn = create_network()
+def softmax(z):
+    t = np.exp(z)
+    return t / np.sum(t)
 
-f = open('dataset.txt', 'r')
-for line in f:
-    arr = line.split(' ')
-    res_mas = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
-    if arr[1][0] == '0':
-        res_mas = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
-    train(nn, arr[0], res_mas)
+def softmax_derrivative(dz, softmaxes):
+    derrivative = np.zeros([NUMBER_OF_POSITIONS, NUMBER_OF_POSITIONS])
+    for i in range(NUMBER_OF_POSITIONS):
+        for j in range(NUMBER_OF_POSITIONS):
+            if(i == j):
+                derrivative[i][j] = softmaxes[i] * (1 - softmaxes[j])
+            else:
+                derrivative[i][j] = -1.0 * softmaxes[i] * softmaxes[j]
+    return np.dot(dz, derrivative)
 
-initialize(nn, "a")
-initialize(nn, "b")
-initialize(nn, "c")
-initialize(nn, "aacaa")
-initialize(nn, "abbba")
-initialize(nn, "aabaa")
-initialize(nn, "abacaba")
+def lastsum(nn, x):
+    return np.dot(nn.adder, x)
+
+def lastsum_derrivative(nn, dz):
+    return np.dot(dz, nn.adder)
+
+def lastsum_derrivative_adder(dz, inp):
+    return np.dot(dz, inp)
+
+def char_to_vector(ch):
+    index = DICTIONARY.index(ch)
+    vec = np.zeros(NUMBER_OF_CHARS)
+    vec[index] = 1.0
+    return vec
+
+def naive_convergence_test(nn, steps):
+    for i in range(steps):
+        print 'step ' + str(i)
+        print 'error a: ' + str(nn.train("a", 0.0))
+        print 'error b: ' + str(nn.train("b", 1.0))
+
+nn = NeuralNetwork();
+naive_convergence_test(nn, 11)
