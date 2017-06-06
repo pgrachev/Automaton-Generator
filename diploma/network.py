@@ -27,7 +27,7 @@ class NeuralNetwork:
                     self.tensor[to][ch][fr] = z[to]
         self.adder = np.zeros(NUMBER_OF_POSITIONS)
         for to in range(NUMBER_OF_POSITIONS):
-            self.adder[to] = 1.0 * to / (NUMBER_OF_POSITIONS - 1)
+            self.adder[to] = 1.0 * (to + 1) / (NUMBER_OF_POSITIONS)
 
 
     def check(self, word):
@@ -55,7 +55,6 @@ class NeuralNetwork:
             for i in range(cases_left):
                 average_error += cost_function(dataset[i][1], self.check(dataset[i][0]))
             average_error /= cases_left
-            print self.adder
             print "Average error: " + str(average_error)
 
     def train(self, word, exp):
@@ -178,7 +177,6 @@ def cut(x):
         return 0.0
     return x
 
-nn = NeuralNetwork();
 
 f = open('dataset.txt', 'r')
 dataset = []
@@ -189,5 +187,8 @@ for line in f:
         isOk = 0.0
     dataset.append([arr[0], isOk])
 
+
+nn = NeuralNetwork();
 nn.train_online(dataset)
 nn.get_automaton()
+

@@ -35,7 +35,7 @@ for x in range(NUMBER_OF_SAMPLES_1):
     f.write(s + ' ' + str(targetValue) + '\n')
 
 for x in range(NUMBER_OF_SAMPLES_2):
-    l = random.randint(MAX_STR_LENGTH_1 + 1, MAX_STR_LENGTH_2)
+    l = random.randint(4, MAX_STR_LENGTH_2)
     s = generate_right_queue(l)
     targetValue = int(is_ok(s))
     f.write(s + ' ' + str(targetValue) + '\n')
