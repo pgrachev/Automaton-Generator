@@ -1,8 +1,8 @@
 import random
 
 NUMBER_OF_SAMPLES_1 = 50
-NUMBER_OF_SAMPLES_2 = 475
-NUMBER_OF_SAMPLES_3 = 475
+NUMBER_OF_SAMPLES_2 = 750
+NUMBER_OF_SAMPLES_3 = 200
 NUMBER_OF_SAMPLES_4 = 500
 MAX_STR_LENGTH_1 = 3
 MAX_STR_LENGTH_2 = 10
@@ -12,23 +12,35 @@ MAX_STR_LENGTH_4 = 10
 def generate_random_string(length):
     s = ''
     for x in range(length):
-        s += chr(97 + random.randint(0, 1))
+        s += chr(97 + random.randint(0, 2))
     return s
 
 def generate_right_queue(length):
     s = ''
     x = random.random()
-    ch1 = 'a'
-    ch2 = 'b'
-    if(x > 0.5):
-        ch1, ch2 = ch2, ch1
-    cnt = 0;
-    while (cnt != length):
-        if(cnt % 2 == 0):
-            s += ch1
+    DICT = ['a', 'b', 'c']
+    last = ''
+    s = ''
+    if (x > 0.66):
+        s += 'c'
+        last = 'c'
+    else:
+        if (x > 0.33):
+            s += 'b'
+            last = 'b'
         else:
-            s += ch2
-        cnt += 1
+            s += 'a'
+            last = 'a'
+    while(len(s) != length):
+        local_dict = ['a', 'b', 'c']
+        local_dict.remove(last)
+        x = random.random()
+        if (x > 0.5):
+            s += local_dict[1]
+            last = local_dict[1]
+        else:
+            s += local_dict[0]
+            last = local_dict[0]
     return s
 
 def generate_quasiright_queue(length):
@@ -43,8 +55,6 @@ def is_ok(string):
             result = False
             break
     return result
-
-print generate_quasiright_queue(3)
 
 f = open('dataset.txt', 'w')
 for x in range(NUMBER_OF_SAMPLES_1):
