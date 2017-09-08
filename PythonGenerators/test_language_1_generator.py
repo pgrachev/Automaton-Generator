@@ -46,7 +46,7 @@ def is_ok(string):
 
 print generate_quasiright_queue(3)
 
-f = open('dataset.txt', 'w')
+f = open('tl1_dataset.txt', 'w')
 for x in range(NUMBER_OF_SAMPLES_1):
     l = random.randint(1, MAX_STR_LENGTH_1)
     s = generate_random_string(l);

@@ -16,7 +16,7 @@ def generate_random_string(length):
 def is_ok(string):
     return (len(string) % 2 == 0 or len(string) % 7 == 0)
 
-f = open('dataset.txt', 'w')
+f = open('tl6_dataset.txt', 'w')
 for x in range(NUMBER_OF_SAMPLES_1):
     l = random.randint(1, MAX_STR_LENGTH_1)
     s = generate_random_string(l);
