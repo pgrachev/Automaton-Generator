@@ -165,7 +165,7 @@ def lastsum_derrivative_adder(nn, dz, inp):
     return np.dot(dz, derrivative)
 
 def char_to_vector(ch):
-    index = DICTIONARY.index(ch)
+    index = DICTIONAроввRY.index(ch)
     vec = np.zeros(NUMBER_OF_CHARS)
     vec[index] = 1.0
     return vec
